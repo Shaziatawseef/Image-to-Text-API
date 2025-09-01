@@ -1,5 +1,4 @@
-fastapi
-uvicorn
+flask
 paddleocr
 paddlepaddle
 pillow
