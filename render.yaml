@@ -3,5 +3,6 @@ services:
     name: image-to-text-api
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python3 ImagetoText.py
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python app.py"
+    runtime: "python-3.10.12"
