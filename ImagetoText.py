@@ -5,60 +5,61 @@ from paddleocr import PaddleOCR
 from PIL import Image
 from io import BytesIO
 
-# Initialize Flask app
+# Initialize PaddleOCR (English only for speed)
+ocr_model = PaddleOCR(use_angle_cls=False, lang='en')
+
 app = Flask(__name__)
 
-# Initialize PaddleOCR once (English only for speed)
-ocr = PaddleOCR(use_angle_cls=True, lang='en')
-
-@app.route('/')
+@app.route("/")
 def home():
     return jsonify({
-        "status": True,
-        "message": "Image-to-Text API is running. Use /ocr?url=IMAGE_URL"
+        "message": "Image-to-Text API is running. Use /ocr?url=IMAGE_URL",
+        "status": True
     })
 
-@app.route('/ocr', methods=['GET'])
-def ocr_from_url():
-    image_url = request.args.get("url")
-
-    if not image_url:
-        return jsonify({
-            "status": False,
-            "error": "Query parameter 'url' is required. Example: /ocr?url=https://example.com/captcha.png"
-        }), 400
-
+@app.route("/ocr", methods=["GET"])
+def ocr():
     try:
-        # Fetch image from URL
-        response = requests.get(image_url, timeout=10)
-        response.raise_for_status()
+        img_url = request.args.get("url")
+        if not img_url:
+            return jsonify({
+                "status": False,
+                "error": "Query parameter 'url' is required. Example: /ocr?url=https://example.com/captcha.png"
+            })
 
-        # Open as image
-        img = Image.open(BytesIO(response.content)).convert("RGB")
+        # Download image from URL
+        response = requests.get(img_url, timeout=10)
+        if response.status_code != 200:
+            return jsonify({
+                "status": False,
+                "error": f"Failed to fetch image. HTTP {response.status_code}"
+            })
+
+        # Load image
+        img = Image.open(BytesIO(response.content))
 
         # Run OCR
-        ocr = PaddleOCR(use_angle_cls=True)  # enable classification at init
-result = ocr.ocr(img_path)
+        result = ocr_model.ocr(img, cls=False)  # No unexpected keyword error
+
         # Extract text
-        extracted_texts = []
-        for line in result:
-            for box, (text, confidence) in line:
-                extracted_texts.append(text)
+        texts = []
+        for line in result[0]:
+            texts.append(line[1][0])
 
         return jsonify({
             "status": True,
-            "url": image_url,
-            "extracted_text": " ".join(extracted_texts).strip(),
-            "texts": extracted_texts
+            "url": img_url,
+            "text": " ".join(texts) if texts else "",
+            "details": texts
         })
 
     except Exception as e:
         return jsonify({
             "status": False,
             "error": str(e)
-        }), 500
+        })
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
