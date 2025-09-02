@@ -2,55 +2,51 @@ import os
 import requests
 from flask import Flask, request, jsonify
 from paddleocr import PaddleOCR
-from PIL import Image
-from io import BytesIO
 
-# Initialize PaddleOCR (English only for speed)
-ocr_model = PaddleOCR(use_angle_cls=False, lang='en')
+# Initialize OCR with cls enabled (no cls inside predict!)
+ocr = PaddleOCR(use_angle_cls=True, lang='en')
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return jsonify({
-        "message": "Image-to-Text API is running. Use /ocr?url=IMAGE_URL",
+        "message": "Captcha OCR API is running. Use /ocr?url=IMAGE_URL",
         "status": True
     })
 
 @app.route("/ocr", methods=["GET"])
-def ocr():
+def ocr_api():
+    image_url = request.args.get("url")
+    if not image_url:
+        return jsonify({
+            "status": False,
+            "error": "Query parameter 'url' is required. Example: /ocr?url=https://example.com/captcha.png"
+        })
+
     try:
-        img_url = request.args.get("url")
-        if not img_url:
-            return jsonify({
-                "status": False,
-                "error": "Query parameter 'url' is required. Example: /ocr?url=https://example.com/captcha.png"
-            })
-
-        # Download image from URL
-        response = requests.get(img_url, timeout=10)
+        # Download image
+        response = requests.get(image_url, timeout=10)
         if response.status_code != 200:
-            return jsonify({
-                "status": False,
-                "error": f"Failed to fetch image. HTTP {response.status_code}"
-            })
-
-        # Load image
-        img = Image.open(BytesIO(response.content))
+            return jsonify({"status": False, "error": "Failed to fetch image"})
+        
+        # Save temporary file
+        image_path = "captcha.png"
+        with open(image_path, "wb") as f:
+            f.write(response.content)
 
         # Run OCR
-        result = ocr_model.ocr(img, cls=False)  # No unexpected keyword error
+        results = ocr.ocr(image_path, cls=True)
 
-        # Extract text
-        texts = []
-        for line in result[0]:
-            texts.append(line[1][0])
+        text_output = []
+        for line in results:
+            for box, (text, confidence) in line:
+                text_output.append({"text": text, "confidence": float(confidence)})
 
         return jsonify({
             "status": True,
-            "url": img_url,
-            "text": " ".join(texts) if texts else "",
-            "details": texts
+            "url": image_url,
+            "results": text_output
         })
 
     except Exception as e:
@@ -59,7 +55,6 @@ def ocr():
             "error": str(e)
         })
 
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    # Render needs host=0.0.0.0
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
