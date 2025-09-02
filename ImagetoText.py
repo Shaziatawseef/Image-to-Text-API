@@ -37,7 +37,7 @@ def ocr_from_url():
         img = Image.open(BytesIO(response.content)).convert("RGB")
 
         # Run OCR
-        result = ocr.ocr(img, cls=True)
+        result = ocr.ocr(img, cls=False)
 
         # Extract text
         extracted_texts = []
