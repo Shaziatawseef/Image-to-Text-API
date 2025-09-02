@@ -37,8 +37,8 @@ def ocr_from_url():
         img = Image.open(BytesIO(response.content)).convert("RGB")
 
         # Run OCR
-        result = ocr.ocr(img, cls=False)
-
+        ocr = PaddleOCR(use_angle_cls=True)  # enable classification at init
+result = ocr.ocr(img_path)
         # Extract text
         extracted_texts = []
         for line in result:
