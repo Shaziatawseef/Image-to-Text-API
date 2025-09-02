@@ -1,48 +1,64 @@
-import io
+import os
 import requests
 from flask import Flask, request, jsonify
 from paddleocr import PaddleOCR
 from PIL import Image
+from io import BytesIO
 
-# Initialize Flask
+# Initialize Flask app
 app = Flask(__name__)
 
-# Initialize PaddleOCR (English only for speed)
+# Initialize PaddleOCR once (English only for speed)
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
 
-@app.route("/")
+@app.route('/')
 def home():
-    return jsonify({"status": True, "message": "Image to Text API Running"})
+    return jsonify({
+        "status": True,
+        "message": "Image-to-Text API is running. Use /ocr?url=IMAGE_URL"
+    })
 
-@app.route("/ocr", methods=["POST"])
-def ocr_api():
+@app.route('/ocr', methods=['GET'])
+def ocr_from_url():
+    image_url = request.args.get("url")
+
+    if not image_url:
+        return jsonify({
+            "status": False,
+            "error": "Query parameter 'url' is required. Example: /ocr?url=https://example.com/captcha.png"
+        }), 400
+
     try:
-        if "url" in request.json:  # If image URL is provided
-            image_url = request.json["url"]
-            response = requests.get(image_url, timeout=10)
-            img_bytes = io.BytesIO(response.content)
-        elif "file" in request.files:  # If image file is uploaded
-            img_bytes = request.files["file"]
-        else:
-            return jsonify({"status": False, "error": "No image provided"}), 400
+        # Fetch image from URL
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
 
-        # Convert to PIL Image
-        image = Image.open(img_bytes).convert("RGB")
+        # Open as image
+        img = Image.open(BytesIO(response.content)).convert("RGB")
 
         # Run OCR
-        result = ocr.ocr(image, cls=True)
+        result = ocr.ocr(img, cls=True)
 
         # Extract text
-        extracted_text = " ".join([line[1][0] for res in result for line in res])
+        extracted_texts = []
+        for line in result:
+            for box, (text, confidence) in line:
+                extracted_texts.append(text)
 
         return jsonify({
             "status": True,
-            "text": extracted_text
+            "url": image_url,
+            "extracted_text": " ".join(extracted_texts).strip(),
+            "texts": extracted_texts
         })
 
     except Exception as e:
-        return jsonify({"status": False, "error": str(e)}), 500
+        return jsonify({
+            "status": False,
+            "error": str(e)
+        }), 500
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
