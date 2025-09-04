@@ -1,6 +1,6 @@
-flask
-easyocr
-pillow
-requests
-torch==2.2.2
-torchvision==0.17.2
+flask==3.1.2
+easyocr==1.7.2
+pillow==11.0.0
+requests==2.32.3
+torch==2.5.1
+torchvision==0.20.1
