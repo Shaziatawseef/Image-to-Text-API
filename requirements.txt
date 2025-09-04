@@ -2,5 +2,5 @@ flask
 easyocr
 pillow
 requests
-torch==2.0.1
-torchvision==0.15.2
+torch==2.2.2
+torchvision==0.17.2
