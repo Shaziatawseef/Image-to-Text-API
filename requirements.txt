@@ -2,5 +2,6 @@ flask
 easyocr
 pillow
 requests
-torch
+torch==2.8.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
 gunicorn
